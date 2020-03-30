@@ -60,6 +60,8 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define USER_BUTTON_Pin GPIO_PIN_13
 #define USER_BUTTON_GPIO_Port GPIOC
+#define SCOPE_TRIGGER2_Pin GPIO_PIN_3
+#define SCOPE_TRIGGER2_GPIO_Port GPIOC
 #define STLINK_TX_Pin GPIO_PIN_2
 #define STLINK_TX_GPIO_Port GPIOA
 #define STLINK_RX_Pin GPIO_PIN_3
@@ -76,6 +78,8 @@ void Error_Handler(void);
 #define TMS_GPIO_Port GPIOA
 #define TCK_Pin GPIO_PIN_14
 #define TCK_GPIO_Port GPIOA
+#define SCOPE_TRIGGER1_Pin GPIO_PIN_10
+#define SCOPE_TRIGGER1_GPIO_Port GPIOC
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */

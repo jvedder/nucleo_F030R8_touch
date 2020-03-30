@@ -26,6 +26,8 @@
 #include <string.h>
 #include <stdio.h>
 
+#define SYSTICK_MASK  (0x80L)
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -66,7 +68,9 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_TIM3_Init(void);
+#if 0
 static void Dump_TIM3(void);
+#endif
 
 /* USER CODE BEGIN PFP */
 
@@ -113,64 +117,97 @@ int main(void)
   printf("\r\nPOR\r\n");
   printf("Build: " __DATE__ ", " __TIME__ "\r\n");
 
-  printf("--------\r\n");
 
-  TIM3->CR1 = 0x0000;   // disable timer
-  TIM3->SR = 0x0000;    // clear interrupt flags
-  TIM3->ARR = 0xFFFF;   // autoreload value
-  TIM3->CCER = 0x0100;  // CH3 Rising Edge
-  TIM3->CNT = 0x0000;   // clear counter
-  TIM3->CCR3 = 0x0000;  // clear result
-  TIM3->CR1 = 0x0001;   // enable timer
-
-  printf("Enabled rising\r\n");
-  Dump_TIM3();
-
-  HAL_GPIO_WritePin(CAP_DRIVE_GPIO_Port, CAP_DRIVE_Pin, GPIO_PIN_SET);
-  printf("Driven high\r\n");
-  while ( (TIM3->SR & 0x0008) == 0)
+  /* synchronize to SYSTTICK */
+  while ( (HAL_GetTick() & SYSTICK_MASK) != 0)
   {
+      //printf("T1 %08lX\r\n", HAL_GetTick());
       //spin wait
   }
-  Dump_TIM3();
-
-
-  Delay_ms(100);
-  printf("--------\r\n");
-
-  TIM3->CR1 = 0x0000;   // disable timer
-  TIM3->SR = 0x0000;    // clear interrupt flags
-  TIM3->ARR = 0xFFFF;   // autoreload value
-  TIM3->CCER = 0x0300;  // CH3 Falling Edge
-  TIM3->CNT = 0x0000;   // clear counter
-  TIM3->CCR3 = 0x0000;  // clear result
-  TIM3->CR1 = 0x0001;   // enable timer
-
-  printf("Enabled falling\r\n");
-  Dump_TIM3();
-
-  HAL_GPIO_WritePin(CAP_DRIVE_GPIO_Port, CAP_DRIVE_Pin, GPIO_PIN_RESET);
-  printf("Driven low\r\n");
-  while ( (TIM3->SR & 0x0008) == 0)
+  printf(".\r\n");
+  while ( (HAL_GetTick() & SYSTICK_MASK) == 0)
   {
+      //printf("T2 %08lX\r\n", HAL_GetTick());
       //spin wait
   }
-  Dump_TIM3();
+  printf(".\r\n");
+  while ( (HAL_GetTick() & SYSTICK_MASK) != 0)
+  {
+      //printf("T3 %08lX\r\n", HAL_GetTick());
+      //spin wait
+  }
+  printf(".\r\n");
 
-  beep(100,0);
-
-  // printf("value=%02X\r\n", 128);
 
   /* USER CODE END 2 */
  
- 
-
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+      /* USER CODE END WHILE */
 
-    /* USER CODE END WHILE */
+      /* config timer for rising edge */
+      TIM3->CR1 = 0x0000;   // disable timer
+      TIM3->SR = 0x0000;    // clear interrupt flags
+      TIM3->ARR = 0xFFFF;   // autoreload value
+      TIM3->CCER = 0x0100;  // CH3 Rising Edge
+      TIM3->CNT = 0x0000;   // clear counter
+      TIM3->CCR3 = 0x0000;  // clear result
+      TIM3->CR1 = 0x0001;   // enable timer
+
+      /* Start Cap Charge & flag Start */
+      //printf("H\r\n");
+      HAL_GPIO_WritePin(GPIOC, CAP_DRIVE_Pin | SCOPE_TRIGGER1_Pin, GPIO_PIN_SET);
+      while ( (TIM3->SR & 0x0008) == 0)
+      {
+          //spin wait
+      }
+
+      /* flag TIM3 Input Capture */
+      HAL_GPIO_WritePin(GPIOC, SCOPE_TRIGGER2_Pin, GPIO_PIN_SET);
+
+      /* show results */
+      printf("%04X  ", (uint16_t) TIM3->CCR3);
+
+      /* wait for SYSTICK bit high */
+      while ( (HAL_GetTick() & SYSTICK_MASK) == 0)
+      {
+          //spin wait
+      }
+
+      /* config timer for falling edge */
+      TIM3->CR1 = 0x0000;   // disable timer
+      TIM3->SR = 0x0000;    // clear interrupt flags
+      TIM3->ARR = 0xFFFF;   // autoreload value
+      TIM3->CCER = 0x0300;  // CH3 Falling Edge
+      TIM3->CNT = 0x0000;   // clear counter
+      TIM3->CCR3 = 0x0000;  // clear result
+      TIM3->CR1 = 0x0001;   // enable timer
+
+      /* Start Cap Discharge & flag Start */
+      //printf("L\r\n");
+      HAL_GPIO_WritePin(GPIOC, CAP_DRIVE_Pin | SCOPE_TRIGGER1_Pin, GPIO_PIN_RESET);
+      while ( (TIM3->SR & 0x0008) == 0)
+      {
+          //spin wait
+      }
+
+      /* flag TIM3 Input Capture */
+      HAL_GPIO_WritePin(GPIOC, SCOPE_TRIGGER2_Pin, GPIO_PIN_RESET);
+
+      /* show results */
+      printf("%04X\r\n", (uint16_t) TIM3->CCR3);
+
+      /* wait for SYSTICK bit low */
+      while ( (HAL_GetTick() & SYSTICK_MASK) != 0)
+      {
+          //spin wait
+      }
+
+
+    /* USER CODE END 2 */
+
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
@@ -320,7 +357,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOA_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(CAP_DRIVE_GPIO_Port, CAP_DRIVE_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOC, SCOPE_TRIGGER2_Pin|CAP_DRIVE_Pin|SCOPE_TRIGGER1_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOA, BUZZ_N_Pin|BUZZ_P_Pin, GPIO_PIN_RESET);
@@ -331,12 +368,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(USER_BUTTON_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : CAP_DRIVE_Pin */
-  GPIO_InitStruct.Pin = CAP_DRIVE_Pin;
+  /*Configure GPIO pins : SCOPE_TRIGGER2_Pin CAP_DRIVE_Pin SCOPE_TRIGGER1_Pin */
+  GPIO_InitStruct.Pin = SCOPE_TRIGGER2_Pin|CAP_DRIVE_Pin|SCOPE_TRIGGER1_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-  HAL_GPIO_Init(CAP_DRIVE_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
   /*Configure GPIO pins : BUZZ_N_Pin BUZZ_P_Pin */
   GPIO_InitStruct.Pin = BUZZ_N_Pin|BUZZ_P_Pin;
@@ -350,6 +387,7 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 
 
+#if 0
 static void Dump_TIM3(void)
 {
 //    for(int i=0; i<20; i++)
@@ -362,7 +400,6 @@ static void Dump_TIM3(void)
     printf("%s%08lX\r\n", "CCR3 ", TIM3->CCR3);
 }
 
-#if 0
 static void CAP_DriveMode(void)
 {
   GPIO_InitTypeDef GPIO_InitStruct = {0};
@@ -392,6 +429,7 @@ static void CAP_SenseMode(void)
   HAL_GPIO_Init(CAP_DRIVE_GPIO_Port, &GPIO_InitStruct);
 }
 #endif
+
 
 void print(const char *text)
 {
